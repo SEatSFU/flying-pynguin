@@ -12,33 +12,40 @@ class LoggerDecorator:
     def log_decorator(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            result = func(*args, **kwargs)
-            timestamp = datetime.datetime.now()
-            log_message = self.log_format.format(
-                timestamp=timestamp,
-                args=args,
-                kwargs=kwargs,
-                result=result
-            )
-            filename = os.path.join(self.log_dir, f"{func.__name__}_log.txt")
-            self._write_log(filename, log_message)
+            try:
+                result = func(*args, **kwargs)
+                message = self.log_format.format(
+                    timestamp=datetime.datetime.now(),
+                    args=args,
+                    kwargs=kwargs,
+                    result=result
+                )
+            except Exception as e:
+                message = f"[{datetime.datetime.now()}] Args: {args}, Kwargs: {kwargs}. Exception: {e}"
+                result = f"Exception: {e}"
+                self._write_log(os.path.join(self.log_dir, f"{func.__name__}_log.txt"), message, "ERROR")
+                raise
+            else:
+                self._write_log(os.path.join(self.log_dir, f"{func.__name__}_log.txt"), message)
+
             return result
 
         return wrapper
 
-    def _write_log(self, filename, message):
+    def _write_log(self, filename, message, log_level=None):
+        if log_level is None:
+            log_level = self.log_level
         with open(filename, "a") as file:
-            file.write(f"{self.log_level}: {message}\n")
+            file.write(f"{log_level}: {message}\n")
             file.write("-" * 40 + "\n")
-
 
 # Example Usage
 logger = LoggerDecorator("logs")
 
-
 @logger.log_decorator
 def sample_function(a, b):
-    return a + b
+    return a / b  # Example function that could raise an exception
+
 
 
 @logger.log_decorator
@@ -52,8 +59,14 @@ def triangle(x: int, y: int, z: int) -> str:
 
 
 if __name__ == "__main__":
-    # Testing the decorator
     sample_function(5, 3)
-    sample_function(2, 4)
     triangle(3, 3, 3)
+    sample_function(5, 1)
+    sample_function(2, 2)
+    try:
+        sample_function(5, 0)  # This call should result in a ZeroDivisionError
+    except ZeroDivisionError:
+        pass
+    sample_function(2, 1)
     triangle(3, 3, 4)
+    triangle(3, 4, 5)
